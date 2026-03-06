@@ -1,0 +1,12 @@
+{
+	"version": "10",
+	"aliases": {
+		"taiga-spt3g": {
+			"url": "https://taiga-dtn-s3.ncsa.illinois.edu:51009",
+			"accessKey": "",
+			"secretKey": "",
+			"api": "s3v4",
+			"path": "auto"
+		}
+	}
+}

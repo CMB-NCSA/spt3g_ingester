@@ -1,0 +1,23 @@
+name: spt3g-ingest
+
+networks:
+  internal:
+    external: false
+
+services:
+  g3worker:
+    image: g3worker:latest
+    platform: linux/x86_64
+    build:
+      context: ..
+      dockerfile: ./container/Dockerfile
+    networks:
+      - internal
+    command:
+      - bash
+      - -c
+      - bash /home/spt/test.sh
+    volumes:
+      # - ./mc/config.json:/home/spt/.mc/config.json:ro
+      - ./data:/home/spt/data
+      - ./scripts/test.sh:/home/spt/test.sh:ro
