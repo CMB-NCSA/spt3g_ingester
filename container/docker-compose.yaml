@@ -24,6 +24,14 @@ x-env-flower: &env-flower
 x-build-args: &build-args
   UID: "${USERID:-1000}"
   SPT3G_SOFTWARE_PARALLELISM: 12
+x-env-django: &env-django
+  # Dev environment settings
+  DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
+  DEV_MODE: "${DEV_MODE:-true}"
+  # Django base configuration
+  DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD:-password}"
+  DJANGO_SUPERUSER_USERNAME: "${DJANGO_SUPERUSER_USERNAME:-admin}"
+  DJANGO_SUPERUSER_EMAIL: "${DJANGO_SUPERUSER_EMAIL:-test@example.com}"
 
 name: spt3g-ingest
 
@@ -65,10 +73,8 @@ services:
           cpus: "${CELERY_WORKER_LIMIT_CPUS:-4.0}"
           memory: ${CELERY_WORKER_LIMIT_MEMORY:-4G}
     environment:
-      # Dev environment settings
-      DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
-      DEV_MODE: "${DEV_MODE:-true}"
       <<: [
+        *env-django,
         *env-celery,
         *env-db,
         *env-message-broker
@@ -93,16 +99,18 @@ services:
         <<: *build-args
     command: bash entrypoints/run_celery_beat.sh
     environment:
+      # QUERY_RAW_DATA_INTERVAL
+      # TODO: Increase interval when running real task
+      QUERY_RAW_DATA_INTERVAL: "${QUERY_RAW_DATA_INTERVAL:-60}"
       DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
       DEV_MODE: "${DEV_MODE:-true}"
+      MAKE_MIGRATIONS: "${MAKE_MIGRATIONS:-false}"
       <<: [
+        *env-django,
         *env-celery,
         *env-db,
         *env-message-broker
       ]
-      # QUERY_RAW_DATA_INTERVAL
-      # TODO: Increase interval when running real task
-      QUERY_RAW_DATA_INTERVAL: "${QUERY_RAW_DATA_INTERVAL:-60}"
     networks:
       - internal
     volumes:
@@ -125,6 +133,7 @@ services:
       - 127.0.0.1:${FLOWER_PORT:-8888}:${FLOWER_PORT:-8888}
     environment:
       <<: [
+        *env-django,
         *env-db,
         *env-message-broker,
         *env-flower
