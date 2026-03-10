@@ -10,7 +10,7 @@ cd "${APP_ROOT_DIR:-/opt}/ingest"
 set +u
 if [ "$MAKE_MIGRATIONS" == "true" ]; then
   echo "Generating database migration scripts..."
-  python manage.py makemigrations --no-input core
+  python manage.py makemigrations --no-input project
   exit 0
 fi
 set -u
