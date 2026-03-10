@@ -1,23 +1,170 @@
+x-env-db: &env-db
+  # Django database configuration
+  DATABASE_HOST: "${DATABASE_HOST:-django-db}"
+  DATABASE_PORT: "${DATABASE_PORT:-5432}"
+  DATABASE_DB: "${DATABASE_DB:-django}"
+  DATABASE_USER: "${DATABASE_USER:-django}"
+  DATABASE_PASSWORD: "${DATABASE_PASSWORD:-password}"
+  POSTGRES_USER: "${DATABASE_USER:-django}"
+  POSTGRES_PASSWORD: "${DATABASE_PASSWORD:-password}"
+  POSTGRES_DB: "${DATABASE_DB:-django}"
+x-env-message-broker: &env-message-broker
+  # Message broker configuration
+  MESSAGE_BROKER_HOST: "${MESSAGE_BROKER_HOST:-redis}"
+  MESSAGE_BROKER_PORT: "${MESSAGE_BROKER_PORT:-6379}"
+x-env-celery: &env-celery
+  CELERY_LOG_LEVEL: ${CELERY_LOG_LEVEL:-INFO}
+  CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-4}
+x-env-flower: &env-flower
+  # Flower configuration
+  FLOWER_LOG_LEVEL: "${FLOWER_LOG_LEVEL:-INFO}"
+  FLOWER_URL_PREFIX: "${FLOWER_URL_PREFIX:-}"
+  FLOWER_HOST: "${FLOWER_HOST:-flower}"
+  FLOWER_PORT: "${FLOWER_PORT:-8888}"
+x-build-args: &build-args
+  UID: "${USERID:-1000}"
+  SPT3G_SOFTWARE_PARALLELISM: 12
+
 name: spt3g-ingest
 
 networks:
   internal:
     external: false
 
+volumes:
+  django-db: {}
+  django-static: {}
+  valkey-data: {}
+
 services:
-  g3worker:
+  celery-worker:
     image: g3worker:latest
     platform: linux/x86_64
     build:
       context: ..
       dockerfile: ./container/Dockerfile
+      args:
+        <<: *build-args
+    command: bash entrypoints/run_celery_worker.sh alerts
+    restart: on-failure
+    depends_on:
+      django-db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
     networks:
       - internal
-    command:
-      - bash
-      - -c
-      - bash /home/spt/test.sh
+    deploy:
+      mode: replicated
+      replicas: 2
+      resources:
+        reservations:
+          cpus: '0.25'
+          memory: 1G
+        limits:
+          cpus: "${CELERY_WORKER_LIMIT_CPUS:-4.0}"
+          memory: ${CELERY_WORKER_LIMIT_MEMORY:-4G}
+    environment:
+      # Dev environment settings
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
+      DEV_MODE: "${DEV_MODE:-true}"
+      <<: [
+        *env-celery,
+        *env-db,
+        *env-message-broker
+      ]
+      # Application configuration
+      APP_ROOT_DIR: "${APP_ROOT_DIR:-/opt}"
     volumes:
-      # - ./mc/config.json:/home/spt/.mc/config.json:ro
-      - ./data:/home/spt/data
-      - ./scripts/test.sh:/home/spt/test.sh:ro
+      - ../ingest:${APP_ROOT_DIR:-/opt}/ingest
+
+  celery-beat:
+    restart: on-failure
+    depends_on:
+      django-db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    image: g3worker:latest
+    build:
+      context: ..
+      dockerfile: ./container/Dockerfile
+      args:
+        <<: *build-args
+    command: bash entrypoints/run_celery_beat.sh
+    environment:
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
+      DEV_MODE: "${DEV_MODE:-true}"
+      <<: [
+        *env-celery,
+        *env-db,
+        *env-message-broker
+      ]
+      # QUERY_RAW_DATA_INTERVAL
+      # TODO: Increase interval when running real task
+      QUERY_RAW_DATA_INTERVAL: "${QUERY_RAW_DATA_INTERVAL:-60}"
+    networks:
+      - internal
+    volumes:
+      - ../ingest:${APP_ROOT_DIR:-/opt}/ingest
+
+  flower:
+    image: g3worker:latest
+    platform: linux/x86_64
+    build:
+      context: ..
+      dockerfile: ./container/Dockerfile
+      args:
+        <<: *build-args
+    command: bash entrypoints/run_flower.sh
+    networks:
+      internal:
+        aliases:
+          - ${FLOWER_HOST:-flower}
+    ports:
+      - 127.0.0.1:${FLOWER_PORT:-8888}:${FLOWER_PORT:-8888}
+    environment:
+      <<: [
+        *env-db,
+        *env-message-broker,
+        *env-flower
+      ]
+
+  django-db:
+    image: postgres:18.3
+    platform: linux/x86_64
+    restart: always
+    networks:
+      internal:
+        aliases:
+          - ${DATABASE_HOST:-django-db}
+    environment:
+      <<: *env-db
+    volumes:
+      - django-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-django}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  valkey:
+    image: valkey/valkey:9.0.3
+    command: [ "valkey-server", "/usr/local/etc/valkey/valkey.conf" ]
+    ports:
+      - 127.0.0.1:${VALKEY_PORT:-6379}:6379
+    networks:
+      internal:
+        aliases:
+          - "${MESSAGE_BROKER_HOST:-redis}"
+    volumes:
+      - valkey-data:/data
+      - ./valkey:/usr/local/etc/valkey:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "valkey-cli -p ${MESSAGE_BROKER_PORT:-6379} ping | grep PONG"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_interval: 5s
+      start_period: 5s
