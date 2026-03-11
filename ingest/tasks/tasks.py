@@ -1,39 +1,31 @@
-from celery import shared_task
-from django.conf import settings
-from celery import shared_task
-from spt3g_ingest.ingstools import g3worker
-from project.models import DataFile
-from project.object_store import ObjectStore
+import structlog
 import os
 from time import sleep
-import structlog
+from django.conf import settings
+from celery import shared_task
+from celery import shared_task
+from spt3g_ingest.ingstools import g3worker
+from spt3g_ingest.ingstools import FILETYPE_SUFFIX
+from project.models import DataFile
+from project.object_store import ObjectStore
 log = structlog.get_logger()
 
 
 @shared_task(name="g3_worker")
 def g3_worker(uuid):
-    log.info(f'''Querying job "{uuid}"...''')
+    log.info(f'''Querying DataFile object "{uuid}"...''')
     df = DataFile.objects.get(uuid=uuid)
     # Set status to processing
     df.status = DataFile.Status.PROCESSING
     df.save()
     s3 = ObjectStore()
     log.info(f'''Launching ingest job for "{df.object_key}" ("{df.status}")...''')
+    local_raw_filepath = f'/data/raw/{df.object_key}'
     try:
-        # TODO: ensure this file path is unique
-        local_file_path = f'/data/raw/{df.object_key}'
-        s3.download_object(
-            path=os.path.join(
-                settings.S3_CONFIG['base_path'],
-                df.object_key.strip('/'),
-            ),
-            file_path=local_file_path,
-        )
-        assert os.path.exists(local_file_path)
-        infile_list_path = os.path.join('/tmp', os.path.basename(local_file_path))
+        infile_list_path = os.path.join('/tmp', os.path.basename(local_raw_filepath))
         with open(infile_list_path, 'w') as infile_list:
-            infile_list.writelines([local_file_path])
-        g3w = g3worker(**{
+            infile_list.writelines([local_raw_filepath])
+        config = {
             'files': [infile_list_path],
             'outdir': '/data/fits',
             'clobber': False,
@@ -58,7 +50,7 @@ def g3_worker(uuid):
             'indirect_write': False,
             'indirect_write_path': None,
             'output_filetypes': ['FITS'],
-            'loglevel': 'INFO',
+            'loglevel': 'DEBUG',
             'log_format_date': '%Y-%m-%d %H:%M:%S',
             'log_format': '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s',
             'run_dbname': '/dummy/dblib/spt3g_runs.db',
@@ -67,8 +59,37 @@ def g3_worker(uuid):
             'run_insert': False,
             'np': 1,
             'ntheads': 1,
-        })
-        g3w.run_files()
+        }
+        if not os.path.exists(local_raw_filepath):
+            log.info(f'''Missing raw data file "{local_raw_filepath}". Downloading...''')
+            s3.download_object(
+                path=os.path.join(
+                    settings.S3_CONFIG['base_path'],
+                    df.object_key.strip('/'),
+                ),
+                file_path=local_raw_filepath,
+            )
+        assert os.path.exists(local_raw_filepath)
+        g3w = g3worker(**config)
+        # Generate the FITS output file path and destination object key
+        g3w.precook_g3file(local_raw_filepath)
+        fits_filepath = get_output_filepath(g3w, local_raw_filepath)
+        fits_object_key = os.path.join(
+            settings.S3_CONFIG['base_path'],
+            fits_filepath.replace('/data/fits/', 'fits/'),
+        )
+        # If the object already exists, skip the processing
+        if not s3.object_exists(path=fits_object_key):
+            # If the FITS file already exists locally but was not uploaded for some reason,
+            # skip processing and upload it.
+            if not os.path.exists(fits_filepath):
+                # raise Exception('artificial error')
+                g3w.run_files()
+            # Upload FITS file to S3 bucket
+            s3.put_object(
+                file_path=fits_filepath,
+                path=fits_object_key.strip('/'),
+            )
         # Set status to complete
         df.status = DataFile.Status.COMPLETE
         df.save()
@@ -78,10 +99,23 @@ def g3_worker(uuid):
         df.save()
     finally:
         try:
+            os.remove(local_raw_filepath)
+            os.remove(fits_filepath)
             os.remove(infile_list_path)
-            os.remove(local_file_path)
         except FileNotFoundError:
             pass
+
+
+def get_output_filepath(g3w, local_raw_filepath):
+    if g3w.config.passthrough:
+        suffix = FILETYPE_SUFFIX['passthrough']
+    elif g3w.config.filter_transient:
+        suffix = FILETYPE_SUFFIX['filtered']
+    elif g3w.config.filter_transient_coadd:
+        suffix = FILETYPE_SUFFIX['coaddfiltered']
+    fits_filepath = g3w.set_outname(local_raw_filepath, suffix=suffix, filetype='FITS')
+    log.debug(f'fits_filepath: {fits_filepath}')
+    return fits_filepath
 
 
 def scan_incoming():
