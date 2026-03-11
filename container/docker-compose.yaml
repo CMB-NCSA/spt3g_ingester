@@ -32,6 +32,14 @@ x-env-django: &env-django
   DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD:-password}"
   DJANGO_SUPERUSER_USERNAME: "${DJANGO_SUPERUSER_USERNAME:-admin}"
   DJANGO_SUPERUSER_EMAIL: "${DJANGO_SUPERUSER_EMAIL:-test@example.com}"
+x-env-s3: &env-s3
+  S3_ENDPOINT_URL: "${S3_ENDPOINT_URL:-https://taiga-dtn-s3.ncsa.illinois.edu:51009}"
+  AWS_S3_ACCESS_KEY_ID: "${AWS_S3_ACCESS_KEY_ID:-}"
+  AWS_S3_SECRET_ACCESS_KEY: "${AWS_S3_SECRET_ACCESS_KEY:-}"
+  S3_BUCKET: "${S3_BUCKET:-testbucket}"
+  S3_REGION_NAME: "${S3_REGION_NAME:-}"
+  S3_BASE_PATH: "${S3_BASE_PATH:-/}"
+
 
 name: spt3g-ingest
 
@@ -77,7 +85,8 @@ services:
         *env-django,
         *env-celery,
         *env-db,
-        *env-message-broker
+        *env-message-broker,
+        *env-s3,
       ]
       # Application configuration
       APP_ROOT_DIR: "${APP_ROOT_DIR:-/opt}"
@@ -106,11 +115,13 @@ services:
       DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
       DEV_MODE: "${DEV_MODE:-true}"
       MAKE_MIGRATIONS: "${MAKE_MIGRATIONS:-false}"
+      SUSPEND_CELERY_BEAT: ${SUSPEND_CELERY_BEAT:-false}
       <<: [
         *env-django,
         *env-celery,
         *env-db,
-        *env-message-broker
+        *env-message-broker,
+        *env-s3,
       ]
     networks:
       - internal
@@ -138,7 +149,7 @@ services:
         *env-django,
         *env-db,
         *env-message-broker,
-        *env-flower
+        *env-flower,
       ]
 
   django-db:

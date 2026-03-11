@@ -1,12 +1,26 @@
 import logging.config
 import os
-
+from uuid import uuid4
+import structlog
+log = structlog.get_logger()
 
 ######################################################################
 # Application config
 #
 APP_VERSION = '0.0.0'
 QUERY_RAW_DATA_INTERVAL = int(os.getenv('QUERY_RAW_DATA_INTERVAL', 86400))
+S3_CONFIG = {
+    'endpoint-url': os.getenv("S3_ENDPOINT_URL", ""),
+    'region-name': os.getenv("S3_REGION_NAME", ""),
+    'aws_access_key_id': os.getenv("AWS_S3_ACCESS_KEY_ID", ""),
+    'aws_secret_access_key': os.getenv("AWS_S3_SECRET_ACCESS_KEY", ""),
+    'bucket': os.getenv("S3_BUCKET", ""),
+    'base_path': os.getenv("S3_BASE_PATH", ''),
+}
+if not S3_CONFIG['base_path']:
+    # Randomize base path if not provided to avoid accidental overwrite of existing objects
+    S3_CONFIG['base_path'] = f'/{str(uuid4())}'
+    log.warning(f'''S3 base path set to randomly generated value: "{S3_CONFIG['base_path']}"''')
 
 ######################################################################
 # Django apps and middlewares
