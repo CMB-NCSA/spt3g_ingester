@@ -34,8 +34,8 @@ set -u
 
 # Start worker
 if [[ $DEV_MODE == "true" ]]; then
-    watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- \
-    celery -A project beat --loglevel ${CELERY_LOG_LEVEL:-DEBUG}
+  watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- \
+  celery -A project beat --loglevel ${CELERY_LOG_LEVEL:-DEBUG}
 else
-    celery -A project beat --loglevel ${CELERY_LOG_LEVEL:-INFO}
+  celery -A project beat --loglevel ${CELERY_LOG_LEVEL:-INFO}
 fi
