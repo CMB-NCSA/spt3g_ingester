@@ -10,6 +10,7 @@ class DataFile(models.Model):
         QUEUED = 'QUEUED', _('queued')
         PROCESSING = 'PROCESSING', _('processing')
         COMPLETE = 'COMPLETE', _('complete')
+        FAILED = 'FAILED', _('failed')
 
     def __str__(self):
         return (f'object_key: {self.object_key}, '
@@ -28,3 +29,5 @@ class DataFile(models.Model):
         null=False,
     )
     object_key = models.TextField(null=False, blank=False)
+    time_ingested = models.DateTimeField(auto_now_add=True, verbose_name='Time ingested')
+    time_processed = models.DateTimeField(auto_now=True, verbose_name='Time processed')
