@@ -115,7 +115,7 @@ services:
       DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
       DEV_MODE: "${DEV_MODE:-true}"
       MAKE_MIGRATIONS: "${MAKE_MIGRATIONS:-false}"
-      SUSPEND_CELERY_BEAT: ${SUSPEND_CELERY_BEAT:-false}
+      SUSPEND_CELERY_BEAT: ${SUSPEND_CELERY_BEAT:-true}
       <<: [
         *env-django,
         *env-celery,
