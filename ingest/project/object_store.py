@@ -44,7 +44,8 @@ class ObjectStore:
             secure=secure,
         )
         # self.initialize_bucket()
-        self.part_size = 16 * 1024 * 1024
+        # Taiga S3 does not support multipart uploading
+        # self.part_size = 16 * 1024 * 1024
 
     def initialize_bucket(self):
         bucket_name = self.bucket
@@ -76,14 +77,14 @@ class ObjectStore:
                 object_name=path,
                 data=payload,
                 length=-1,
-                part_size=self.part_size)
+                part_size=payload.getbuffer().nbytes)
         elif file_path:
             log.debug(f'''Uploading file to object store: "{path}"''')
             self.client.fput_object(
                 bucket_name=self.bucket,
                 object_name=path,
                 file_path=file_path,
-                part_size=self.part_size)
+                part_size=os.stat(file_path).st_size)
 
     def get_object(self, path=""):
         response = None
