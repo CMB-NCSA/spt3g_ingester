@@ -22,6 +22,16 @@ echo "Running initialization script..."
 bash entrypoints/django_init.sh
 echo "Django database initialization complete."
 
+set +u
+if [ "$SUSPEND_CELERY_BEAT" == "true" ]; then
+  echo "Suspending Celery Beat"
+  watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- \
+    sleep 1000d
+  exit 0
+fi
+set -u
+
+
 # Start worker
 if [[ $DEV_MODE == "true" ]]; then
     watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- \
