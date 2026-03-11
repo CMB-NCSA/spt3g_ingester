@@ -45,10 +45,9 @@ RUN pip install --no-cache-dir \
     psycopg[binary] \
     structlog \
     valkey \
-    watchdog
-
-RUN pip install --no-cache-dir \
-    redis
+    watchdog \
+    redis \
+    minio
 
 # Create non-root user
 ARG UID=1000
