@@ -72,7 +72,7 @@ services:
       - internal
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: "${CELERY_WORKER_REPLICAS:-1}"
       resources:
         reservations:
           cpus: '0.25'
