@@ -96,6 +96,7 @@ def g3_worker(uuid):
     except Exception as err:
         log.error(f'Error processing file: {err}')
         df.status = DataFile.Status.FAILED
+        df.error_msg = str(err)
         df.save()
     finally:
         try:

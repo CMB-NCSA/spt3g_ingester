@@ -31,3 +31,4 @@ class DataFile(models.Model):
     object_key = models.TextField(null=False, blank=False)
     time_ingested = models.DateTimeField(auto_now_add=True, verbose_name='Time ingested')
     time_processed = models.DateTimeField(auto_now=True, verbose_name='Time processed')
+    error_msg = models.TextField(null=False, blank=False, default='')
