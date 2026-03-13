@@ -1,0 +1,9 @@
+apiVersion: v2
+description: SPT3G raw data ingester
+name: spt3g-ingester
+version: 1.0.0
+dependencies:
+- name: valkey
+  version: "2.2.x"
+  repository: https://groundhog2k.github.io/helm-charts/
+  condition: valkey.enabled

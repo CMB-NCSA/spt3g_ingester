@@ -1,0 +1,84 @@
+{{- define "ingester.env" -}}
+- name: DEV_MODE
+- name: TASK_TIME_LIMIT
+  value: {{ .Values.celery.task_time_limit | quote }}
+- name: TASK_SOFT_TIME_LIMIT
+  value: {{ .Values.celery.task_soft_time_limit | quote }}
+- name: FLOWER_PORT
+  value: {{ .Values.celery.flower.port | quote }}
+- name: FLOWER_UNAUTHENTICATED_API
+  value: {{ .Values.celery.flower.flower_unauthenticated_api | quote }}
+- name: CELERY_LOG_LEVEL
+  value: {{ .Values.celery.log_level | upper | quote }}
+- name: CELERY_WORKER_MAX_MEMORY_PER_CHILD
+  value: {{ .Values.celery.workers.worker_max_memory_per_child | quote }}
+- name: CELERY_WORKER_MAX_TASKS_PER_CHILD
+  value: {{ .Values.celery.workers.worker_max_tasks_per_child | quote }}
+- name: CELERY_CONCURRENCY
+  value: {{ .Values.celery.workers.concurrency | quote }}
+- name: SUSPEND_CELERY_BEAT
+  value: {{ .Values.celery.beat.suspend | quote }}
+- name: DATABASE_HOST
+  {{- if .Values.database.pooler.enabled }}
+  value: "{{ .Values.database.clusterName }}-pooler-rw"
+  {{- else }}
+  value: "{{ .Values.database.clusterName }}-rw"
+  {{- end }}
+- name: DATABASE_PORT
+  value: {{ .Values.database.port | quote }}
+- name: DATABASE_USER
+  value: {{ .Values.database.initdb.username | quote }}
+- name: DATABASE_DB
+  value: {{ .Values.database.initdb.database | quote }}
+- name: DATABASE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      key: password
+      name: {{ .Values.database.initdb.existingSecret | quote }}
+- name: MESSAGE_BROKER_HOST
+  value: {{ .Values.valkey.fullnameOverride }}
+- name: MESSAGE_BROKER_PORT
+  value: {{ if .Values.valkey.haMode.enabled }}{{ .Values.valkey.service.sentinelPort | quote }}{{ else }}{{ .Values.valkey.service.serverPort | quote }}{{ end }}
+- name: VALKEY_SERVICE
+  value: {{ .Values.valkey.fullnameOverride | default "valkey" | quote }}
+- name: VALKEY_MASTER_GROUP_NAME
+  value: {{ if .Values.valkey.haMode.enabled }}{{ .Values.valkey.haMode.masterGroupName | default "valkeyha" | quote }}{{ end }}
+- name: VALKEY_PORT
+  value: {{ if .Values.valkey.haMode.enabled }}{{ .Values.valkey.service.sentinelPort | default 26379 | quote }}{{ else }}{{ .Values.valkey.service.sentinelPort | default 6379 | quote }}{{ end }}
+- name: DJANGO_SUPERUSER_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      key: SUPERUSER_PASSWORD
+      name: django-admin
+- name: SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      key: SECRET_KEY
+      name: django-admin
+- name: DJANGO_SUPERUSER_USERNAME
+  value: admin
+- name: DJANGO_SUPERUSER_EMAIL
+  value: devnull@example.com
+- name: DJANGO_DEBUG
+  value: {{ if eq .Values.common.log_level "debug" }}"true"{{ else }}"false"{{ end }}
+- name: LOG_LEVEL
+  value: {{ .Values.common.log_level | upper | quote }}
+- name: S3_ENDPOINT_URL
+  value: {{ .Values.data.s3.endpoint_url | quote }}
+- name: S3_REGION_NAME
+  value: {{ .Values.data.s3.region_name | quote }}
+- name: S3_BUCKET
+  value: {{ .Values.data.s3.bucket | quote }}
+- name: S3_BASE_PATH
+  value: {{ .Values.data.s3.base_path | quote }}
+- name: AWS_S3_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      key: {{ .Values.data.s3.access_key_id_key | quote }}
+      name: {{ .Values.data.s3.existingSecret | quote }}
+- name: AWS_S3_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      key: {{ .Values.data.s3.secret_access_key_key | quote }}
+      name: {{ .Values.data.s3.existingSecret | quote }}
+{{- end -}}

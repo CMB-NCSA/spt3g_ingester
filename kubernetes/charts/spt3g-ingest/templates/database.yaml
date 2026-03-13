@@ -1,0 +1,53 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.database.clusterName }}
+spec:
+  description: "Django database"
+  instances: {{ .Values.database.replicaCount }}
+  startDelay: 30
+  stopDelay: 100
+  primaryUpdateStrategy: unsupervised
+  logLevel: {{ .Values.database.log_level }}
+  postgresql:
+    parameters:
+      max_connections: '600'
+      shared_buffers: '256MB'
+      effective_cache_size: '768MB'
+      maintenance_work_mem: '64MB'
+      checkpoint_completion_target: '0.9'
+      wal_buffers: '7864kB'
+      default_statistics_target: '100'
+      random_page_cost: '1.1'
+      effective_io_concurrency: '200'
+      work_mem: '655kB'
+      huge_pages: 'off'
+      min_wal_size: '1GB'
+      max_wal_size: '4GB'
+  bootstrap:
+    initdb:
+      database: {{ .Values.database.initdb.database }}
+      owner: {{ .Values.database.initdb.username }}
+      secret:
+        name: {{ .Values.database.initdb.existingSecret }}
+  storage:
+    size: {{ .Values.database.storage.size }}
+    storageClass: {{ .Values.database.storage.storageClass }}
+{{- if .Values.database.pooler.enabled }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: "{{ .Values.database.clusterName }}-pooler-rw"
+spec:
+  cluster:
+    name: {{ .Values.database.clusterName }}
+  instances: {{ .Values.database.pooler.replicas }}
+  type: rw
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: {{ .Values.database.pooler.max_client_conn | quote }}
+      default_pool_size: {{ .Values.database.pooler.default_pool_size | quote }}
+      reserve_pool_size: {{ .Values.database.pooler.reserve_pool_size | quote }}
+{{- end }}

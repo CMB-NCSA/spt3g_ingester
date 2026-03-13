@@ -1,0 +1,73 @@
+image:
+  url: "registry.gitlab.com/spt3g/kubernetes/spt3g-ingester:latest"
+  imagePullPolicy: Always
+
+data:
+  s3:
+    existingSecret: "s3-auth"
+    access_key_id_key: "AWS_ACCESS_KEY_ID"
+    secret_access_key_key: "AWS_SECRET_ACCESS_KEY"
+    endpoint_url: "https://taiga-dtn-s3.ncsa.illinois.edu:51009"
+    region_name: ""
+    bucket: "testbucket"
+    base_path: "/"
+
+common:
+  log_level: "debug"
+
+celery:
+  log_level: "info"
+  task_time_limit: 7600
+  task_soft_time_limit: 7200
+  workers:
+    replicas: 2
+    worker_max_memory_per_child: "4194304"  # 4 GiB, quoted to avoid exponential notation conversion
+    worker_max_tasks_per_child: 10
+    concurrency: 6
+    resources:
+      requests:
+        cpu: 1
+        memory: 4Gi
+      limits:
+        cpu: 8
+        memory: 32Gi
+  beat:
+    replicas: 1
+    # Prevent Beat from starting without disabling the container. Useful for manual interventions.
+    suspend: true
+  flower:
+    replicas: 1
+    flower_unauthenticated_api: true
+    port: 5555
+
+database:
+  pooler:
+    enabled: false
+    replicas: 3
+    max_client_conn: 300
+    default_pool_size: 200
+    reserve_pool_size: 100
+  enabled: true
+  log_level: "warning"
+  clusterName: "django-db"
+  replicaCount: 2
+  port: 5432
+  initdb:
+    database: "ingester"
+    username: "ingester"
+    existingSecret: "django-db"
+  storage:
+    storageClass: "longhorn"
+    size: "5Gi"
+    accessModes:
+    - ReadWriteMany
+
+valkey:
+  fullnameOverride: "valkey"
+  service:
+    serverPort: 6379
+    sentinelPort: 26379
+  haMode:
+    enabled: true
+    replicas: 3
+    masterGroupName: "valkeyha"

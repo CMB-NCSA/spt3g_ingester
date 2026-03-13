@@ -54,7 +54,7 @@ volumes:
 
 services:
   celery-worker:
-    image: g3worker:latest
+    image: registry.gitlab.com/spt3g/kubernetes/spt3g-ingester:latest
     platform: linux/x86_64
     build:
       context: ..
@@ -102,7 +102,7 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
-    image: g3worker:latest
+    image: registry.gitlab.com/spt3g/kubernetes/spt3g-ingester:latest
     build:
       context: ..
       dockerfile: ./container/Dockerfile
@@ -132,7 +132,7 @@ services:
       - ../data/fits:/tmp/fits
 
   flower:
-    image: g3worker:latest
+    image: registry.gitlab.com/spt3g/kubernetes/spt3g-ingester:latest
     platform: linux/x86_64
     build:
       context: ..
