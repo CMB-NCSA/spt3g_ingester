@@ -92,7 +92,8 @@ services:
       APP_ROOT_DIR: "${APP_ROOT_DIR:-/opt}"
     volumes:
       - ../ingest:${APP_ROOT_DIR:-/opt}/ingest
-      - ../data:/data
+      - ../data/raw:/tmp/raw
+      - ../data/fits:/tmp/fits
 
   celery-beat:
     restart: on-failure
@@ -127,7 +128,8 @@ services:
       - internal
     volumes:
       - ../ingest:${APP_ROOT_DIR:-/opt}/ingest
-      - ../data:/data
+      - ../data/raw:/tmp/raw
+      - ../data/fits:/tmp/fits
 
   flower:
     image: g3worker:latest

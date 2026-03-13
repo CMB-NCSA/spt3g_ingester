@@ -20,14 +20,14 @@ def g3_worker(uuid):
     df.save()
     s3 = ObjectStore()
     log.info(f'''Launching ingest job for "{df.object_key}" ("{df.status}")...''')
-    local_raw_filepath = f'/data/raw/{df.object_key}'
+    local_raw_filepath = f'/tmp/raw/{df.object_key}'
     try:
         infile_list_path = os.path.join('/tmp', os.path.basename(local_raw_filepath))
         with open(infile_list_path, 'w') as infile_list:
             infile_list.writelines([local_raw_filepath])
         config = {
             'files': [infile_list_path],
-            'outdir': '/data/fits',
+            'outdir': '/tmp/fits',
             'clobber': False,
             'compress': 'GZIP_2',
             'filter_transient': True,
@@ -76,7 +76,7 @@ def g3_worker(uuid):
         fits_filepath = get_output_filepath(g3w, local_raw_filepath)
         fits_object_key = os.path.join(
             settings.S3_CONFIG['base_path'],
-            fits_filepath.replace('/data/fits/', 'fits/'),
+            fits_filepath.replace('/tmp/fits/', 'fits/'),
         )
         # If the object already exists, skip the processing
         if not s3.object_exists(path=fits_object_key):
