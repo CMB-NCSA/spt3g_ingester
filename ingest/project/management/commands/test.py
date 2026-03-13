@@ -8,5 +8,5 @@ class Command(BaseCommand):
     help = "Test script"
 
     def handle(self, *args, **options):
-        # Test the periodic task that discovers new raw data files
+        # Test the periodic task that discovers and processes new raw data files
         query_raw_data.delay()
