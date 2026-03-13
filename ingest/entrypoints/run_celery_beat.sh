@@ -26,7 +26,7 @@ set +u
 if [ "$SUSPEND_CELERY_BEAT" == "true" ]; then
   echo "Suspending Celery Beat"
   watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- \
-    sleep 1000d
+    sleep infinity
   exit 0
 fi
 set -u
