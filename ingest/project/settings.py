@@ -65,16 +65,16 @@ USE_TZ = True
 DATETIME_FORMAT = 'Y-m-d H:m:s'
 DATE_FORMAT = 'Y-m-d'
 # Caching
-VALKEY_SERVICE = os.environ.get('VALKEY_SERVICE', 'redis')
+VALKEY_SERVICE = os.environ.get('VALKEY_SERVICE', 'valkey')
 VALKEY_PORT = int(os.environ.get('VALKEY_PORT', '6379'))
 # If running Redis in high-availability mode using Sentinel, there must be a master group name set
 VALKEY_MASTER_GROUP_NAME = os.environ.get('VALKEY_MASTER_GROUP_NAME', '')
-VALKEY_OR_SENTINEL = 'sentinel' if VALKEY_MASTER_GROUP_NAME else 'redis'
+REDIS_OR_SENTINEL = 'sentinel' if VALKEY_MASTER_GROUP_NAME else 'redis'
 # Caching config
 CACHES = {
     'default': {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"{VALKEY_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}",
+        "LOCATION": f"{REDIS_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}",
     }
 }
 
@@ -104,23 +104,11 @@ CELERY_IMPORTS = [
 ]
 CELERY_TASK_ROUTES = {}
 CELERY_TASK_DEFAULT_QUEUE = 'alerts'
-VALKEY_SERVICE = os.environ.get('VALKEY_SERVICE', 'redis')
-VALKEY_PORT = int(os.environ.get('VALKEY_PORT', '6379'))
-# If running Redis in high-availability mode using Sentinel, there must be a master group name set
-VALKEY_MASTER_GROUP_NAME = os.environ.get('VALKEY_MASTER_GROUP_NAME', '')
-VALKEY_OR_SENTINEL = 'sentinel' if VALKEY_MASTER_GROUP_NAME else 'redis'
-# Caching config
-CACHES = {
-    'default': {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"{VALKEY_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}",
-    }
-}
 # Backends & brokers
-CELERY_BROKER_URL = f"{VALKEY_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}"
+CELERY_BROKER_URL = f"{REDIS_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}"
 CELERY_BROKER_TRANSPORT_OPTIONS = {'master_name': VALKEY_MASTER_GROUP_NAME}
 # Results backend
-CELERY_RESULT_BACKEND = f"{VALKEY_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}"
+CELERY_RESULT_BACKEND = f"{REDIS_OR_SENTINEL}://{VALKEY_SERVICE}:{VALKEY_PORT}"
 CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
     'master_name': VALKEY_MASTER_GROUP_NAME,
     'retry_policy': {
