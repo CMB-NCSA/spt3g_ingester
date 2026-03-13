@@ -119,6 +119,8 @@ CELERYD_REDIRECT_STDOUTS_LEVEL = "INFO"
 CELERY_TASK_SOFT_TIME_LIMIT = int(os.environ.get("CELERY_TASK_SOFT_TIME_LIMIT", "3600"))
 CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "3800"))
 CELERY_TASK_TRACK_STARTED = True
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = int(os.environ.get("CELERY_WORKER_MAX_MEMORY_PER_CHILD", "12288"))
+CELERY_WORKER_MAX_TASKS_PER_CHILD = int(os.environ.get("CELERY_WORKER_MAX_TASKS_PER_CHILD", "1000"))
 
 ######################################################################
 # Database
