@@ -17,7 +17,7 @@ S3_CONFIG = {
     'bucket': os.getenv("S3_BUCKET", ""),
     'base_path': os.getenv("S3_BASE_PATH", ''),
 }
-if not S3_CONFIG['base_path']:
+if S3_CONFIG['endpoint-url'] and not S3_CONFIG['base_path']:
     # Randomize base path if not provided to avoid accidental overwrite of existing objects
     S3_CONFIG['base_path'] = f'/{str(uuid4())}'
     log.warning(f'''S3 base path set to randomly generated value: "{S3_CONFIG['base_path']}"''')
