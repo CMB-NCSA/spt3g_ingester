@@ -34,15 +34,18 @@ def show_all():
     log.info(f'''Number of completed files: {len(qs)}''')
 
 
-def reset_failed():
+def reset_failed(include_processing=False):
     show_all()
-    qs = DataFile.objects.filter(status=DataFile.Status.FAILED)
+    if include_processing:
+        qs = DataFile.objects.filter(status__in=[DataFile.Status.FAILED, DataFile.Status.PROCESSING])
+    else:
+        qs = DataFile.objects.filter(status=DataFile.Status.FAILED)
     for df in qs:
         # log.info(f'''status: {df.status}, path: {df.object_key}''')
-        log.warning(f'''"{df.object_key}" has failed. Reseting status to QUEUED.''')
+        log.warning(f'''Reseting status of "{df.object_key}" to QUEUED.''')
         df.status = DataFile.Status.QUEUED
         df.save()
-    log.info(f'''Number of failed files: {len(qs)}''')
+    log.info(f'''Number of reset files: {len(qs)}''')
 
 
 def s3_test():
