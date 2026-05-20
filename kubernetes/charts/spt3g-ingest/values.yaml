@@ -20,17 +20,17 @@ celery:
   task_time_limit: 7600
   task_soft_time_limit: 7200
   workers:
-    replicas: 2
+    replicas: 1
     worker_max_memory_per_child: "4194304"  # 4 GiB, quoted to avoid exponential notation conversion
     worker_max_tasks_per_child: 10
-    concurrency: 6
+    concurrency: 4
     resources:
       requests:
         cpu: 1
         memory: 4Gi
       limits:
-        cpu: 8
-        memory: 32Gi
+        cpu: 4
+        memory: 14Gi
   beat:
     replicas: 1
     # Prevent Beat from starting without disabling the container. Useful for manual interventions.
