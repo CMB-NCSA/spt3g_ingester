@@ -1,0 +1,37 @@
+band:
+- 90GHz
+- 150GHz
+- 220GHz
+clobber: false
+coadds: null
+compress: GZIP_2
+compute_snr_annulus: false
+dbname: /dummy/dblib/spt3g_archive.db
+field_name: null
+filter_transient: true
+filter_transient_coadd: false
+ignore_season: null
+indirect_write: false
+indirect_write_path: null
+ingest: false
+log_format: '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s'
+log_format_date: '%Y-%m-%d %H:%M:%S'
+loglevel: DEBUG
+mask_filter: false
+np: 1
+ntheads: 1
+outdir: /tmp/fits
+output_filetypes:
+- FITS
+passthrough: false
+polarized: false
+preload_coadds: false
+replace: false
+run_check: false
+run_dbname: /dummy/dblib/spt3g_runs.db
+run_insert: false
+run_tablename: g3runinfo
+stage: false
+stage_path: null
+tablename: g3fileinfo
+

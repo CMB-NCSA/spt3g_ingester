@@ -1,5 +1,6 @@
 import logging.config
 import os
+from pathlib import Path
 from uuid import uuid4
 import structlog
 log = structlog.get_logger()
@@ -21,6 +22,7 @@ if S3_CONFIG['endpoint-url'] and not S3_CONFIG['base_path']:
     # Randomize base path if not provided to avoid accidental overwrite of existing objects
     S3_CONFIG['base_path'] = f'/{str(uuid4())}'
     log.warning(f'''S3 base path set to randomly generated value: "{S3_CONFIG['base_path']}"''')
+G3_WORKER_CONFIG_PATH = '/etc/g3_worker_config.default.yaml'
 
 ######################################################################
 # Django apps and middlewares

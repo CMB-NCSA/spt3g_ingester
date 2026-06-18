@@ -94,6 +94,7 @@ services:
       - ../ingest:${APP_ROOT_DIR:-/opt}/ingest
       - ../data/raw:/tmp/raw
       - ../data/fits:/tmp/fits
+      - ../ingest/g3_worker_config.default.yaml:/etc/g3_worker_config.default.yaml:ro
 
   celery-beat:
     restart: on-failure
@@ -130,6 +131,7 @@ services:
       - ../ingest:${APP_ROOT_DIR:-/opt}/ingest
       - ../data/raw:/tmp/raw
       - ../data/fits:/tmp/fits
+      - ../ingest/g3_worker_config.default.yaml:/etc/g3_worker_config.default.yaml:ro
 
   flower:
     image: registry.gitlab.com/spt3g/kubernetes/spt3g-ingester:latest

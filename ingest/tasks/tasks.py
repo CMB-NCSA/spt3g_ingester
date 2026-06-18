@@ -1,8 +1,8 @@
 import structlog
 import os
 from time import sleep
+import yaml
 from django.conf import settings
-from celery import shared_task
 from celery import shared_task
 from spt3g_ingest.ingstools import g3worker
 from spt3g_ingest.ingstools import FILETYPE_SUFFIX
@@ -12,7 +12,7 @@ log = structlog.get_logger()
 
 
 @shared_task(name="g3_worker")
-def g3_worker(uuid):
+def g3_worker(uuid, options):
     log.info(f'''Querying DataFile object "{uuid}"...''')
     df = DataFile.objects.get(uuid=uuid)
     # Set status to processing
@@ -22,44 +22,17 @@ def g3_worker(uuid):
     log.info(f'''Launching ingest job for "{df.object_key}" ("{df.status}")...''')
     local_raw_filepath = f'/tmp/raw/{df.object_key}'
     try:
+        # Load the default configuration
+        with open(settings.G3_WORKER_CONFIG_PATH, "r") as conf_file:
+            config = yaml.load(conf_file, Loader=yaml.SafeLoader)
+        # Override the default values with any input options
+        config.update(options)
+        # Construct the input file list
         infile_list_path = os.path.join('/tmp', os.path.basename(local_raw_filepath))
         with open(infile_list_path, 'w') as infile_list:
             infile_list.writelines([local_raw_filepath])
-        config = {
-            'files': [infile_list_path],
-            'outdir': '/tmp/fits',
-            'clobber': False,
-            'compress': 'GZIP_2',
-            'filter_transient': True,
-            'filter_transient_coadd': False,
-            'passthrough': False,
-            'coadds': None,
-            'preload_coadds': False,
-            'band': ["90GHz", "150GHz", "220GHz"],
-            'polarized': False,
-            'compute_snr_annulus': False,
-            'mask_filter': False,
-            'field_name': None,
-            'ignore_season': None,
-            'ingest': False,
-            'replace': False,
-            'tablename': 'g3fileinfo',
-            'dbname': '/dummy/dblib/spt3g_archive.db',
-            'stage': False,
-            'stage_path': None,
-            'indirect_write': False,
-            'indirect_write_path': None,
-            'output_filetypes': ['FITS'],
-            'loglevel': 'DEBUG',
-            'log_format_date': '%Y-%m-%d %H:%M:%S',
-            'log_format': '[%(asctime)s.%(msecs)03d][%(levelname)s][%(name)s][%(funcName)s] %(message)s',
-            'run_dbname': '/dummy/dblib/spt3g_runs.db',
-            'run_tablename': 'g3runinfo',
-            'run_check': False,
-            'run_insert': False,
-            'np': 1,
-            'ntheads': 1,
-        }
+        config['files'] = [infile_list_path]
+        # Download raw data file to the declared path
         if not os.path.exists(local_raw_filepath):
             log.info(f'''Missing raw data file "{local_raw_filepath}". Downloading...''')
             s3.download_object(
@@ -70,6 +43,7 @@ def g3_worker(uuid):
                 file_path=local_raw_filepath,
             )
         assert os.path.exists(local_raw_filepath)
+        # Instantiate the raw data processor
         g3w = g3worker(**config)
         # Generate the FITS output file path and destination object key
         g3w.precook_g3file(local_raw_filepath)
@@ -139,7 +113,18 @@ def view_files():
 
 def launch_jobs():
     for df in DataFile.objects.filter(status=DataFile.Status.QUEUED):
-        g3_worker.delay(df.uuid)
+        g3_worker.delay(df.uuid, options={'passthrough': True,
+                                          'filter_transient': False,
+                                          'filter_transient_coadd': False,
+                                          'subtract_coadd': False})
+        g3_worker.delay(df.uuid, options={'passthrough': False,
+                                          'filter_transient': True,
+                                          'filter_transient_coadd': False,
+                                          'subtract_coadd': False})
+        g3_worker.delay(df.uuid, options={'passthrough': False,
+                                          'filter_transient': False,
+                                          'filter_transient_coadd': True,
+                                          'subtract_coadd': True})
         # Artificially reduce job launch rate for testing purposes
         sleep(1)
 

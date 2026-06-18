@@ -65,4 +65,5 @@ RUN mkdir .mc
 COPY container/mc/config.json /root/.mc/config.json
 
 COPY --chown=${USERNAME}:${USERNAME} ./ingest ${APP_ROOT_DIR}/ingest
+COPY --chown=${USERNAME}:${USERNAME} ./ingest/g3_worker_config.default.yaml /etc/g3_worker_config.default.yaml
 WORKDIR ${APP_ROOT_DIR}/ingest
