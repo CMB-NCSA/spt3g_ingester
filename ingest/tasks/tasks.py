@@ -4,22 +4,46 @@ from time import sleep
 import yaml
 from django.conf import settings
 from celery import shared_task
+from celery import chain
+from celery import group
 from spt3g_ingest.ingstools import g3worker
 from spt3g_ingest.ingstools import FILETYPE_SUFFIX
-from project.models import DataFile
+from project.models import DataFile, ProcessedFile
 from project.object_store import ObjectStore
 log = structlog.get_logger()
 
 
-@shared_task(name="g3_worker")
-def g3_worker(uuid, options):
-    log.info(f'''Querying DataFile object "{uuid}"...''')
+@shared_task(name="raw_data_download")
+def raw_data_download(uuid):
     df = DataFile.objects.get(uuid=uuid)
     # Set status to processing
     df.status = DataFile.Status.PROCESSING
     df.save()
     s3 = ObjectStore()
     log.info(f'''Launching ingest job for "{df.object_key}" ("{df.status}")...''')
+    local_raw_filepath = f'/tmp/raw/{df.object_key}'
+    # Download raw data file to the declared path
+    if not os.path.exists(local_raw_filepath):
+        log.info(f'''Missing raw data file "{local_raw_filepath}". Downloading...''')
+        s3.download_object(
+            path=os.path.join(
+                settings.S3_CONFIG['base_path'],
+                df.object_key.strip('/'),
+            ),
+            file_path=local_raw_filepath,
+        )
+    assert os.path.exists(local_raw_filepath)
+
+
+@shared_task(name="g3_worker")
+def g3_worker(uuid, options):
+    # log.info(f'''Querying DataFile object "{uuid}"...''')
+    df = DataFile.objects.get(uuid=uuid)
+    # # Set status to processing
+    # df.status = DataFile.Status.PROCESSING
+    # df.save()
+    s3 = ObjectStore()
+    # log.info(f'''Launching ingest job for "{df.object_key}" ("{df.status}")...''')
     local_raw_filepath = f'/tmp/raw/{df.object_key}'
     try:
         # Load the default configuration
@@ -32,16 +56,16 @@ def g3_worker(uuid, options):
         with open(infile_list_path, 'w') as infile_list:
             infile_list.writelines([local_raw_filepath])
         config['files'] = [infile_list_path]
-        # Download raw data file to the declared path
-        if not os.path.exists(local_raw_filepath):
-            log.info(f'''Missing raw data file "{local_raw_filepath}". Downloading...''')
-            s3.download_object(
-                path=os.path.join(
-                    settings.S3_CONFIG['base_path'],
-                    df.object_key.strip('/'),
-                ),
-                file_path=local_raw_filepath,
-            )
+        # # Download raw data file to the declared path
+        # if not os.path.exists(local_raw_filepath):
+        #     log.info(f'''Missing raw data file "{local_raw_filepath}". Downloading...''')
+        #     s3.download_object(
+        #         path=os.path.join(
+        #             settings.S3_CONFIG['base_path'],
+        #             df.object_key.strip('/'),
+        #         ),
+        #         file_path=local_raw_filepath,
+        #     )
         assert os.path.exists(local_raw_filepath)
         # Instantiate the raw data processor
         g3w = g3worker(**config)
@@ -52,6 +76,8 @@ def g3_worker(uuid, options):
             settings.S3_CONFIG['base_path'],
             fits_filepath.replace('/tmp/fits/', 'fits/'),
         )
+        # Create and associate the ProcessedFile object
+        processed_file, _ = ProcessedFile.objects.get_or_create(source_file=df, object_key=fits_object_key)
         # If the object already exists, skip the processing
         if not s3.object_exists(path=fits_object_key):
             # If the FITS file already exists locally but was not uploaded for some reason,
@@ -64,21 +90,37 @@ def g3_worker(uuid, options):
                 file_path=fits_filepath,
                 path=fits_object_key.strip('/'),
             )
-        # Set status to complete
-        df.status = DataFile.Status.COMPLETE
-        df.save()
     except Exception as err:
         log.error(f'Error processing file: {err}')
         df.status = DataFile.Status.FAILED
-        df.error_msg = str(err)
+        df.error_msg += f'''{err}\n'''
         df.save()
-    finally:
-        try:
-            os.remove(local_raw_filepath)
-            os.remove(fits_filepath)
-            os.remove(infile_list_path)
-        except FileNotFoundError:
-            pass
+    # TODO: Handle garbage collection
+    # finally:
+    #     try:
+    #         os.remove(local_raw_filepath)
+    #         os.remove(fits_filepath)
+    #         os.remove(infile_list_path)
+    #     except FileNotFoundError:
+    #         pass
+
+
+@shared_task(name="verify_output_files")
+def verify_output_files(uuid):
+    s3 = ObjectStore()
+    df = DataFile.objects.get(uuid=uuid)
+    for output_file in ProcessedFile.objects.filter(source_file=df):
+        if not s3.object_exists(path=output_file.object_key):
+            error_msg = f'Missing expected output object: "{output_file.object_key}"'
+            log.error(error_msg)
+            # Set status to failed and capture error message
+            df.status = DataFile.Status.FAILED
+            df.error_msg += f'''{error_msg}\n'''
+            df.save()
+            return
+    # Set status to complete
+    df.status = DataFile.Status.COMPLETE
+    df.save()
 
 
 def get_output_filepath(g3w, local_raw_filepath):
@@ -113,18 +155,25 @@ def view_files():
 
 def launch_jobs():
     for df in DataFile.objects.filter(status=DataFile.Status.QUEUED):
-        g3_worker.delay(df.uuid, options={'passthrough': True,
-                                          'filter_transient': False,
-                                          'filter_transient_coadd': False,
-                                          'subtract_coadd': False})
-        g3_worker.delay(df.uuid, options={'passthrough': False,
-                                          'filter_transient': True,
-                                          'filter_transient_coadd': False,
-                                          'subtract_coadd': False})
-        g3_worker.delay(df.uuid, options={'passthrough': False,
-                                          'filter_transient': False,
-                                          'filter_transient_coadd': True,
-                                          'subtract_coadd': True})
+        workflow = chain(
+            raw_data_download.si(df.uuid),
+            group(
+                g3_worker.si(df.uuid, options={'passthrough': True,
+                                               'filter_transient': False,
+                                               'filter_transient_coadd': False,
+                                               'subtract_coadd': False}),
+                g3_worker.si(df.uuid, options={'passthrough': False,
+                                               'filter_transient': True,
+                                               'filter_transient_coadd': False,
+                                               'subtract_coadd': False}),
+                g3_worker.si(df.uuid, options={'passthrough': False,
+                                               'filter_transient': False,
+                                               'filter_transient_coadd': True,
+                                               'subtract_coadd': True}),
+            ),
+            verify_output_files.si(df.uuid),
+        )
+        workflow.delay()
         # Artificially reduce job launch rate for testing purposes
         sleep(1)
 
