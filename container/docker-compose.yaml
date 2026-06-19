@@ -33,12 +33,15 @@ x-env-django: &env-django
   DJANGO_SUPERUSER_USERNAME: "${DJANGO_SUPERUSER_USERNAME:-admin}"
   DJANGO_SUPERUSER_EMAIL: "${DJANGO_SUPERUSER_EMAIL:-test@example.com}"
 x-env-s3: &env-s3
-  S3_ENDPOINT_URL: "${S3_ENDPOINT_URL:-https://taiga-dtn-s3.ncsa.illinois.edu:51009}"
-  AWS_S3_ACCESS_KEY_ID: "${AWS_S3_ACCESS_KEY_ID:-}"
-  AWS_S3_SECRET_ACCESS_KEY: "${AWS_S3_SECRET_ACCESS_KEY:-}"
+  # S3_ENDPOINT_URL: "${S3_ENDPOINT_URL:-https://taiga-dtn-s3.ncsa.illinois.edu:51009}"
+  S3_ENDPOINT_URL: "${S3_ENDPOINT_URL:-http://object-store:9000}"
+  AWS_S3_ACCESS_KEY_ID: "${AWS_S3_ACCESS_KEY_ID:-minioadmin}"
+  AWS_S3_SECRET_ACCESS_KEY: "${AWS_S3_SECRET_ACCESS_KEY:-minioadmin}"
   S3_BUCKET: "${S3_BUCKET:-testbucket}"
   S3_REGION_NAME: "${S3_REGION_NAME:-}"
   S3_BASE_PATH: "${S3_BASE_PATH:-/}"
+  S3_SERVER_PORT: "${S3_SERVER_PORT:-9000}"
+  S3_CONSOLE_PORT: "${S3_CONSOLE_PORT:-9001}"
 
 
 name: spt3g-ingest
@@ -51,6 +54,7 @@ volumes:
   django-db: {}
   django-static: {}
   valkey-data: {}
+  object-data: {}
 
 services:
   celery-worker:
@@ -194,3 +198,18 @@ services:
       retries: 3
       start_interval: 5s
       start_period: 5s
+
+  object-store:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    ports:
+      - 127.0.0.1:${S3_CONSOLE_PORT:-9001}:${S3_CONSOLE_PORT:-9001}
+      - 127.0.0.1:${S3_SERVER_PORT:-9000}:${S3_SERVER_PORT:-9000}
+    networks:
+      - internal
+    command:
+    - server
+    - /data
+    - --console-address
+    - ":${S3_CONSOLE_PORT:-9001}"
+    volumes:
+      - object-data:/data

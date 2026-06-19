@@ -55,3 +55,16 @@ docker compose -f container/docker-compose.yaml up -d --build celery-beat
 ```
 
 After the script is generated, reset the `MAKE_MIGRATIONS` to false and restart the full application.
+
+### S3 object store
+
+Using the MinIO CLI utility `mc`, you can initialize local test data following the example below:
+
+```bash
+# Create the bucket alias
+$ mc alias set spt3g-ingester-test http://127.0.0.1:9000 minioadmin minioadmin
+$ mc mb spt3g-ingester-test/testbucket
+$ mc cp \
+    taiga-spt3g/testbucket/incoming/281024909_150GHz_tonly.g3.gz \
+    spt3g-ingester-test/testbucket/incoming/
+```
