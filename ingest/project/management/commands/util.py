@@ -4,7 +4,7 @@ custom Django management command. See the `dev.py` module docstring for usage in
 """
 import structlog
 log = structlog.get_logger()
-from project.models import DataFile
+from project.models import DataFile, ProcessedFile
 from tasks.tasks import query_raw_data
 
 
@@ -17,6 +17,10 @@ def show_all():
     log.info('''Show all DataFile objects:''')
     for df in DataFile.objects.all():
         log.info(f'''status: {df.status}, path: {df.object_key}''')
+        if df.status == DataFile.Status.FAILED:
+            log.info(f'''  ERROR:: "{df.error_msg}"''')
+        for idx, pf in enumerate(ProcessedFile.objects.filter(source_file=df)):
+            log.info(f'''    Output file {idx}: {pf.object_key}''')
 
     qs = DataFile.objects.filter(status=DataFile.Status.QUEUED)
     # for df in qs:
@@ -44,6 +48,7 @@ def reset_failed(include_processing=False):
         # log.info(f'''status: {df.status}, path: {df.object_key}''')
         log.warning(f'''Reseting status of "{df.object_key}" to QUEUED.''')
         df.status = DataFile.Status.QUEUED
+        df.error_msg = ''
         df.save()
     log.info(f'''Number of reset files: {len(qs)}''')
 
